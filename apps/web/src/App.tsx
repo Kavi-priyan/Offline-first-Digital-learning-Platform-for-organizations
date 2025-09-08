@@ -132,6 +132,8 @@ export default function App() {
   const [report, setReport] = useState<any[]>([]);
   const [quizBuilder, setQuizBuilder] = useState<{ lessonId?: string; question?: string; options?: string; answerIndex?: number }>({});
   const [noteDraft, setNoteDraft] = useState<{ lessonId?: string; text?: string }>({});
+  const [activeQuizId, setActiveQuizId] = useState<string | null>(null);
+  const [takeQuizAnswers, setTakeQuizAnswers] = useState<Record<string, number>>({});
   const backendBaseUrl = 'http://localhost:4000';
 
   useEffect(() => {
@@ -139,7 +141,8 @@ export default function App() {
       setLessons(await db.lessons.toArray() as Lesson[]);
       setQuizzes(await db.quizzes.toArray() as Quiz[]);
       setProgress(await db.progress.toArray() as Progress[]);
-      setNotes(await db.notes.toArray() as Note[]);
+      // @ts-ignore - notes table exists in v2
+      setNotes(await (db as any).notes.toArray() as Note[]);
     })();
   }, []);
 
@@ -174,20 +177,32 @@ export default function App() {
     setQuizBuilder({});
   }
 
-  async function submitAttempt() {
-    const q = (await db.quizzes.toArray())[0];
-    if (!q) return alert('Create a quiz first');
-    const attempt = { at: new Date().toISOString(), answers: { q1: 1 } };
+  async function submitAttemptForActiveQuiz() {
+    if (!activeQuizId) return;
+    const q = quizzes.find(qz => qz.id === activeQuizId);
+    if (!q) return;
+    const questions = (q.data?.questions || []) as Array<{ id: string; answer: number }>;
+    let score = 0;
+    const answers: Record<string, number> = {};
+    for (const ques of questions) {
+      const sel = takeQuizAnswers[ques.id];
+      answers[ques.id] = sel;
+      if (typeof sel === 'number' && sel === ques.answer) score += 1;
+    }
+    const attempt = { at: new Date().toISOString(), answers };
     const p: Progress = {
       id: crypto.randomUUID(),
       studentId: 'student-001',
       quizId: q.id,
-      score: 1,
+      score,
       attempts: [attempt],
       updatedAt: new Date().toISOString()
     };
     await db.progress.put(p);
     setProgress(await db.progress.toArray() as Progress[]);
+    setActiveQuizId(null);
+    setTakeQuizAnswers({});
+    alert(`Submitted. Score: ${score}/${questions.length}`);
   }
 
   async function addNote() {
@@ -195,8 +210,10 @@ export default function App() {
     const text = (noteDraft.text || '').trim();
     if (!lessonId || !text) return alert('Select a lesson and enter note text');
     const n: Note = { id: crypto.randomUUID(), lessonId, text, updatedAt: new Date().toISOString() };
-    await db.notes.put(n);
-    setNotes(await db.notes.toArray() as Note[]);
+    // @ts-ignore
+    await (db as any).notes.put(n);
+    // @ts-ignore
+    setNotes(await (db as any).notes.toArray() as Note[]);
     setNoteDraft({});
   }
 
@@ -206,7 +223,8 @@ export default function App() {
       const toSyncLessons = await db.lessons.toArray();
       const toSyncQuizzes = await db.quizzes.toArray();
       const toSyncProgress = await db.progress.toArray();
-      const toSyncNotes = await db.notes.toArray();
+      // @ts-ignore
+      const toSyncNotes = await (db as any).notes.toArray();
       const res = await fetch(`${backendBaseUrl}/sync`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -235,6 +253,10 @@ export default function App() {
 
   const avgScore = report.length ? (report.reduce((a, r) => a + Number(r.max_score || 0), 0) / report.length).toFixed(2) : '0.00';
   const totalAttempts = report.reduce((a, r) => a + Number(r.attempts_count || 0), 0);
+
+  const activeQuiz = activeQuizId ? quizzes.find(q => q.id === activeQuizId) : null;
+  const activeQuestions: Array<{ id: string; text: string; options: string[]; answer: number }>
+    = (activeQuiz?.data?.questions || []) as any;
 
   return (
     <div style={container}>
@@ -313,10 +335,47 @@ export default function App() {
               <div style={sectionTitle}>Quizzes</div>
               <ul style={list}>
                 {quizzes.map(q => (
-                  <li key={q.id}>Quiz for lesson {q.lessonId} · {new Date(q.updatedAt).toLocaleString()}</li>
+                  <li key={q.id}>
+                    Quiz for lesson {q.lessonId} · {new Date(q.updatedAt).toLocaleString()}
+                    <button style={{ ...buttonBase, marginLeft: 8 }} onClick={() => setActiveQuizId(q.id)}>Open</button>
+                  </li>
                 ))}
               </ul>
             </div>
+
+            {/* Quiz Viewer Panel */}
+            {activeQuiz && (
+              <div style={{ ...section, borderColor: colors.primary }}>
+                <div style={{ ...sectionTitle, marginBottom: 8 }}>Quiz Viewer</div>
+                {activeQuestions.length === 0 && (
+                  <div style={{ color: colors.textMuted }}>No questions in this quiz.</div>
+                )}
+                <div style={{ display: 'grid', gap: 12 }}>
+                  {activeQuestions.map((q) => (
+                    <div key={q.id}>
+                      <div style={{ fontWeight: 600, marginBottom: 6 }}>{q.text}</div>
+                      <div style={{ display: 'grid', gap: 6 }}>
+                        {q.options.map((opt, idx) => (
+                          <label key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <input
+                              type="radio"
+                              name={q.id}
+                              checked={takeQuizAnswers[q.id] === idx}
+                              onChange={() => setTakeQuizAnswers(prev => ({ ...prev, [q.id]: idx }))}
+                            />
+                            <span>{opt}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                  <button style={buttonBase} onClick={() => { setActiveQuizId(null); setTakeQuizAnswers({}); }}>Close</button>
+                  <button style={primaryButton} onClick={submitAttemptForActiveQuiz}>Submit Attempt</button>
+                </div>
+              </div>
+            )}
 
             <div style={section}>
               <div style={sectionTitle}>Progress</div>
