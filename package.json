@@ -1,0 +1,17 @@
+{
+  "name": "sih-2025-offline-learning",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "backend"
+  ],
+  "scripts": {
+    "postinstall": "echo Workspaces installed",
+    "dev:web": "yarn workspace web dev",
+    "dev:mobile": "yarn workspace mobile start",
+    "dev:backend": "yarn workspace backend dev",
+    "build": "yarn workspaces run build"
+  }
+}

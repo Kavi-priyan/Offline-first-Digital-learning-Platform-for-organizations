@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "Nabha Learning Mobile",
+    "slug": "nabha-learning-mobile",
+    "scheme": "nabha",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ]
+  }
+}
