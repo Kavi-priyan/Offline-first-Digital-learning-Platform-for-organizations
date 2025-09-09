@@ -302,6 +302,8 @@ export default function App() {
       // @ts-ignore
       const toSyncNotes = await (db as any).notes.toArray();
       
+      console.log('Syncing progress data:', toSyncProgress);
+      
       const pushRes = await fetch(`${backendBaseUrl}/sync`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -36,8 +36,8 @@ function ensureQuiz(q) {
 function ensureProgress(p) {
   return {
     id: p.id,
-    studentId: p.studentId,
-    quizId: p.quizId,
+    studentId: p.studentId || p.student_id || 'unknown-student',
+    quizId: p.quizId || p.quiz_id,
     score: Number.isFinite(p.score) ? p.score : 0,
     attempts: Array.isArray(p.attempts) ? p.attempts : [],
     updatedAt: toIsoDate(p.updatedAt)
@@ -116,6 +116,9 @@ router.post('/', async (req, res) => {
     for (const raw of progress) {
       const pr = ensureProgress(raw);
       if (!pr.id) throw new Error('progress.id missing');
+      if (!pr.studentId) throw new Error(`progress.studentId missing for progress ${pr.id}. Raw data: ${JSON.stringify(raw)}`);
+      if (!pr.quizId) throw new Error(`progress.quizId missing for progress ${pr.id}. Raw data: ${JSON.stringify(raw)}`);
+      console.log('Syncing progress:', { id: pr.id, studentId: pr.studentId, quizId: pr.quizId });
       await query(
         `INSERT INTO progress (id, student_id, quiz_id, score, attempts, updated_at)
          VALUES ($1, $2, $3, $4, $5::jsonb, $6)
