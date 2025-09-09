@@ -53,6 +53,28 @@ function ensureNote(n) {
   };
 }
 
+// GET endpoint to fetch all data from backend
+router.get('/', async (req, res) => {
+  try {
+    const [lessonsResult, quizzesResult, progressResult, notesResult] = await Promise.all([
+      query('SELECT * FROM lessons ORDER BY updated_at DESC'),
+      query('SELECT * FROM quizzes ORDER BY updated_at DESC'),
+      query('SELECT * FROM progress ORDER BY updated_at DESC'),
+      query('SELECT * FROM lesson_notes ORDER BY updated_at DESC')
+    ]);
+
+    res.json({
+      lessons: lessonsResult.rows,
+      quizzes: quizzesResult.rows,
+      progress: progressResult.rows,
+      notes: notesResult.rows
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'fetch_failed', message: e?.message });
+  }
+});
+
 // Expect body: { lessons, quizzes, progress, notes }
 router.post('/', async (req, res) => {
   try {

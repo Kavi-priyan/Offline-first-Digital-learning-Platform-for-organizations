@@ -138,11 +138,43 @@ export default function App() {
 
   useEffect(() => {
     (async () => {
+      // Load from local database first
       setLessons(await db.lessons.toArray() as Lesson[]);
       setQuizzes(await db.quizzes.toArray() as Quiz[]);
       setProgress(await db.progress.toArray() as Progress[]);
       // @ts-ignore - notes table exists in v2
       setNotes(await (db as any).notes.toArray() as Note[]);
+      
+      // Then try to fetch latest data from backend
+      try {
+        const res = await fetch(`${backendBaseUrl}/sync`);
+        if (res.ok) {
+          const backendData = await res.json();
+          
+          // Update local database with backend data
+          await db.lessons.clear();
+          await db.lessons.bulkAdd(backendData.lessons);
+          
+          await db.quizzes.clear();
+          await db.quizzes.bulkAdd(backendData.quizzes);
+          
+          await db.progress.clear();
+          await db.progress.bulkAdd(backendData.progress);
+          
+          // @ts-ignore
+          await (db as any).notes.clear();
+          // @ts-ignore
+          await (db as any).notes.bulkAdd(backendData.notes);
+
+          // Update UI state with fresh data
+          setLessons(backendData.lessons);
+          setQuizzes(backendData.quizzes);
+          setProgress(backendData.progress);
+          setNotes(backendData.notes);
+        }
+      } catch (e) {
+        console.log('Could not fetch from backend on startup, using local data');
+      }
     })();
   }, []);
 
@@ -217,26 +249,105 @@ export default function App() {
     setNoteDraft({});
   }
 
+  async function fetchFromBackend() {
+    setSyncing(true);
+    try {
+      const res = await fetch(`${backendBaseUrl}/sync`);
+      if (!res.ok) {
+        const text = await res.text();
+        console.error('Fetch failed', res.status, text);
+        alert(`Fetch failed: ${res.status} ${text}`);
+        return;
+      }
+
+      const backendData = await res.json();
+      
+      // Update local database with backend data
+      await db.lessons.clear();
+      await db.lessons.bulkAdd(backendData.lessons);
+      
+      await db.quizzes.clear();
+      await db.quizzes.bulkAdd(backendData.quizzes);
+      
+      await db.progress.clear();
+      await db.progress.bulkAdd(backendData.progress);
+      
+      // @ts-ignore
+      await (db as any).notes.clear();
+      // @ts-ignore
+      await (db as any).notes.bulkAdd(backendData.notes);
+
+      // Update UI state
+      setLessons(backendData.lessons);
+      setQuizzes(backendData.quizzes);
+      setProgress(backendData.progress);
+      setNotes(backendData.notes);
+
+      alert('Successfully fetched latest data from backend!');
+    } catch (e: any) {
+      console.error('Fetch error', e);
+      alert(`Fetch error: ${e?.message ?? 'unknown'}`);
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   async function syncNow() {
     setSyncing(true);
     try {
+      // Step 1: Push local data to backend
       const toSyncLessons = await db.lessons.toArray();
       const toSyncQuizzes = await db.quizzes.toArray();
       const toSyncProgress = await db.progress.toArray();
       // @ts-ignore
       const toSyncNotes = await (db as any).notes.toArray();
-      const res = await fetch(`${backendBaseUrl}/sync`, {
+      
+      const pushRes = await fetch(`${backendBaseUrl}/sync`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ lessons: toSyncLessons, quizzes: toSyncQuizzes, progress: toSyncProgress, notes: toSyncNotes })
       });
-      if (!res.ok) {
-        const text = await res.text();
-        console.error('Sync failed', res.status, text);
-        alert(`Sync failed: ${res.status} ${text}`);
+      
+      if (!pushRes.ok) {
+        const text = await pushRes.text();
+        console.error('Push sync failed', pushRes.status, text);
+        alert(`Push sync failed: ${pushRes.status} ${text}`);
         return;
       }
-      alert('Synced data to backend');
+
+      // Step 2: Fetch updated data from backend
+      const fetchRes = await fetch(`${backendBaseUrl}/sync`);
+      if (!fetchRes.ok) {
+        const text = await fetchRes.text();
+        console.error('Fetch sync failed', fetchRes.status, text);
+        alert(`Fetch sync failed: ${fetchRes.status} ${text}`);
+        return;
+      }
+
+      const backendData = await fetchRes.json();
+      
+      // Step 3: Update local database with backend data
+      await db.lessons.clear();
+      await db.lessons.bulkAdd(backendData.lessons);
+      
+      await db.quizzes.clear();
+      await db.quizzes.bulkAdd(backendData.quizzes);
+      
+      await db.progress.clear();
+      await db.progress.bulkAdd(backendData.progress);
+      
+      // @ts-ignore
+      await (db as any).notes.clear();
+      // @ts-ignore
+      await (db as any).notes.bulkAdd(backendData.notes);
+
+      // Step 4: Update UI state
+      setLessons(backendData.lessons);
+      setQuizzes(backendData.quizzes);
+      setProgress(backendData.progress);
+      setNotes(backendData.notes);
+
+      alert('Successfully synced with backend - data updated!');
     } catch (e: any) {
       console.error('Sync error', e);
       alert(`Sync error: ${e?.message ?? 'unknown'}`);
@@ -273,6 +384,7 @@ export default function App() {
           <>
             <div style={{ ...section, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button style={buttonBase} onClick={addSampleLesson}>Add Lesson (Offline)</button>
+              <button style={buttonBase} onClick={fetchFromBackend} disabled={syncing}>Fetch from Backend</button>
               <button style={primaryButton} onClick={syncNow} disabled={syncing}>{syncing ? 'Syncing…' : 'Sync Now'}</button>
             </div>
 
