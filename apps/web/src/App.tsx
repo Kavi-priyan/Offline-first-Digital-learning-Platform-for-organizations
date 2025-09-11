@@ -142,6 +142,14 @@ export default function App() {
   const backendOrigin = 'http://localhost:4000';
   const backendBaseUrl = 'http://localhost:4000/api';
 
+  // Pagination state
+  const [lessonsPage, setLessonsPage] = useState(1);
+  const [lessonsPageSize, setLessonsPageSize] = useState(5);
+  const [quizzesPage, setQuizzesPage] = useState(1);
+  const [quizzesPageSize, setQuizzesPageSize] = useState(5);
+  const [progressPage, setProgressPage] = useState(1);
+  const [progressPageSize, setProgressPageSize] = useState(5);
+
   useEffect(() => {
     (async () => {
       // Load from local database first
@@ -183,6 +191,23 @@ export default function App() {
       }
     })();
   }, []);
+
+  // Clamp/reset pagination when data or page size changes
+  useEffect(() => { setLessonsPage(1); }, [lessonsPageSize]);
+  useEffect(() => { setQuizzesPage(1); }, [quizzesPageSize]);
+  useEffect(() => { setProgressPage(1); }, [progressPageSize]);
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(lessons.length / lessonsPageSize));
+    if (lessonsPage > maxPage) setLessonsPage(maxPage);
+  }, [lessons, lessonsPage, lessonsPageSize]);
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(quizzes.length / quizzesPageSize));
+    if (quizzesPage > maxPage) setQuizzesPage(maxPage);
+  }, [quizzes, quizzesPage, quizzesPageSize]);
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(progress.length / progressPageSize));
+    if (progressPage > maxPage) setProgressPage(maxPage);
+  }, [progress, progressPage, progressPageSize]);
 
   async function addSampleLesson() {
     const l: Lesson = {
@@ -516,6 +541,22 @@ export default function App() {
   const activeQuestions: Array<{ id: string; text: string; options: string[]; answer: number }>
     = (activeQuiz?.data?.questions || []) as any;
 
+  // Derived pagination slices
+  const lessonsTotal = lessons.length;
+  const lessonsStart = (lessonsPage - 1) * lessonsPageSize;
+  const lessonsEnd = Math.min(lessonsStart + lessonsPageSize, lessonsTotal);
+  const pagedLessons = lessons.slice(lessonsStart, lessonsEnd);
+
+  const quizzesTotal = quizzes.length;
+  const quizzesStart = (quizzesPage - 1) * quizzesPageSize;
+  const quizzesEnd = Math.min(quizzesStart + quizzesPageSize, quizzesTotal);
+  const pagedQuizzes = quizzes.slice(quizzesStart, quizzesEnd);
+
+  const progressTotal = progress.length;
+  const progressStart = (progressPage - 1) * progressPageSize;
+  const progressEnd = Math.min(progressStart + progressPageSize, progressTotal);
+  const pagedProgress = progress.slice(progressStart, progressEnd);
+
   return (
     <div style={container}>
       <div style={shell}>
@@ -599,6 +640,31 @@ export default function App() {
 
             <div style={section}>
               <div style={sectionTitle}>Available Lessons</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                <span style={{ color: colors.textMuted, fontSize: 12 }}>Rows per page</span>
+                <select
+                  value={lessonsPageSize}
+                  onChange={e => setLessonsPageSize(Number(e.target.value))}
+                  style={{ padding: 6, borderRadius: 6, background: colors.panelAlt, color: colors.text, border: `1px solid ${colors.border}` }}
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                </select>
+                <div style={{ marginLeft: 'auto', color: colors.textMuted, fontSize: 12 }}>
+                  {lessonsTotal ? `${lessonsStart + 1}-${lessonsEnd} of ${lessonsTotal}` : '0 of 0'}
+                </div>
+                <button
+                  style={buttonBase}
+                  onClick={() => setLessonsPage(p => Math.max(1, p - 1))}
+                  disabled={lessonsPage === 1}
+                >Prev</button>
+                <button
+                  style={buttonBase}
+                  onClick={() => setLessonsPage(p => Math.min(Math.max(1, Math.ceil(lessonsTotal / lessonsPageSize)), p + 1))}
+                  disabled={lessonsPage >= Math.max(1, Math.ceil(lessonsTotal / lessonsPageSize))}
+                >Next</button>
+              </div>
               <div style={tableWrap}>
                 <table style={tableStyle}>
                   <thead>
@@ -610,7 +676,7 @@ export default function App() {
                     </tr>
                   </thead>
                   <tbody>
-                    {lessons.map(lesson => (
+                    {pagedLessons.map(lesson => (
                       <tr key={lesson.id}>
                         <td style={thtd}>{lesson.title}</td>
                         <td style={thtd}>{lesson.content.slice(0, 50)}...</td>
@@ -682,8 +748,33 @@ export default function App() {
 
             <div style={section}>
               <div style={sectionTitle}>Quizzes</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                <span style={{ color: colors.textMuted, fontSize: 12 }}>Rows per page</span>
+                <select
+                  value={quizzesPageSize}
+                  onChange={e => setQuizzesPageSize(Number(e.target.value))}
+                  style={{ padding: 6, borderRadius: 6, background: colors.panelAlt, color: colors.text, border: `1px solid ${colors.border}` }}
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                </select>
+                <div style={{ marginLeft: 'auto', color: colors.textMuted, fontSize: 12 }}>
+                  {quizzesTotal ? `${quizzesStart + 1}-${quizzesEnd} of ${quizzesTotal}` : '0 of 0'}
+                </div>
+                <button
+                  style={buttonBase}
+                  onClick={() => setQuizzesPage(p => Math.max(1, p - 1))}
+                  disabled={quizzesPage === 1}
+                >Prev</button>
+                <button
+                  style={buttonBase}
+                  onClick={() => setQuizzesPage(p => Math.min(Math.max(1, Math.ceil(quizzesTotal / quizzesPageSize)), p + 1))}
+                  disabled={quizzesPage >= Math.max(1, Math.ceil(quizzesTotal / quizzesPageSize))}
+                >Next</button>
+              </div>
               <ul style={list}>
-                {quizzes.map(q => (
+                {pagedQuizzes.map(q => (
                   <li key={q.id}>
                     Quiz for lesson {q.lessonId} · {new Date(q.updatedAt).toLocaleString()}
                     <button style={{ ...buttonBase, marginLeft: 8 }} onClick={() => setActiveQuizId(q.id)}>Open</button>
@@ -728,8 +819,33 @@ export default function App() {
 
             <div style={section}>
               <div style={sectionTitle}>Progress</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                <span style={{ color: colors.textMuted, fontSize: 12 }}>Rows per page</span>
+                <select
+                  value={progressPageSize}
+                  onChange={e => setProgressPageSize(Number(e.target.value))}
+                  style={{ padding: 6, borderRadius: 6, background: colors.panelAlt, color: colors.text, border: `1px solid ${colors.border}` }}
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                </select>
+                <div style={{ marginLeft: 'auto', color: colors.textMuted, fontSize: 12 }}>
+                  {progressTotal ? `${progressStart + 1}-${progressEnd} of ${progressTotal}` : '0 of 0'}
+                </div>
+                <button
+                  style={buttonBase}
+                  onClick={() => setProgressPage(p => Math.max(1, p - 1))}
+                  disabled={progressPage === 1}
+                >Prev</button>
+                <button
+                  style={buttonBase}
+                  onClick={() => setProgressPage(p => Math.min(Math.max(1, Math.ceil(progressTotal / progressPageSize)), p + 1))}
+                  disabled={progressPage >= Math.max(1, Math.ceil(progressTotal / progressPageSize))}
+                >Next</button>
+              </div>
               <ul style={list}>
-                {progress.map(p => (
+                {pagedProgress.map(p => (
                   <li key={p.id}>{p.studentId} · quiz {p.quizId} · score {p.score} · attempts {p.attempts.length}</li>
                 ))}
               </ul>
