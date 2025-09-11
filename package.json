@@ -13,5 +13,8 @@
     "dev:mobile": "yarn workspace mobile start",
     "dev:backend": "yarn workspace backend dev",
     "build": "yarn workspaces run build"
+  },
+  "dependencies": {
+    "react-native-video": "^6.16.1"
   }
 }

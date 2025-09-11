@@ -17,19 +17,19 @@ function ensureLesson(l) {
     id: l.id,
     title: l.title ?? '',
     content: l.content ?? '',
-    videoUrl: l.videoUrl ?? null,
+    videoUrl: l.videoUrl ?? l.video_url ?? null,
     version: Number.isFinite(l.version) ? l.version : 1,
-    updatedAt: toIsoDate(l.updatedAt)
+    updatedAt: toIsoDate(l.updatedAt ?? l.updated_at)
   };
 }
 
 function ensureQuiz(q) {
   return {
     id: q.id,
-    lessonId: q.lessonId,
+    lessonId: q.lessonId ?? q.lesson_id,
     data: q.data ?? {},
     version: Number.isFinite(q.version) ? q.version : 1,
-    updatedAt: toIsoDate(q.updatedAt)
+    updatedAt: toIsoDate(q.updatedAt ?? q.updated_at)
   };
 }
 
@@ -47,9 +47,9 @@ function ensureProgress(p) {
 function ensureNote(n) {
   return {
     id: n.id,
-    lessonId: n.lessonId,
+    lessonId: n.lessonId ?? n.lesson_id,
     text: n.text ?? '',
-    updatedAt: toIsoDate(n.updatedAt)
+    updatedAt: toIsoDate(n.updatedAt ?? n.updated_at)
   };
 }
 
@@ -64,10 +64,10 @@ router.get('/', async (req, res) => {
     ]);
 
     res.json({
-      lessons: lessonsResult.rows,
-      quizzes: quizzesResult.rows,
-      progress: progressResult.rows,
-      notes: notesResult.rows
+      lessons: lessonsResult.rows.map(ensureLesson),
+      quizzes: quizzesResult.rows.map(ensureQuiz),
+      progress: progressResult.rows.map(ensureProgress),
+      notes: notesResult.rows.map(ensureNote)
     });
   } catch (e) {
     console.error(e);

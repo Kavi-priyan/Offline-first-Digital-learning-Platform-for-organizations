@@ -134,7 +134,13 @@ export default function App() {
   const [noteDraft, setNoteDraft] = useState<{ lessonId?: string; text?: string }>({});
   const [activeQuizId, setActiveQuizId] = useState<string | null>(null);
   const [takeQuizAnswers, setTakeQuizAnswers] = useState<Record<string, number>>({});
-  const backendBaseUrl = 'http://localhost:4000';
+  const [selectedVideoFile, setSelectedVideoFile] = useState<File | null>(null);
+  const [uploadedVideoUrl, setUploadedVideoUrl] = useState<string | undefined>(undefined);
+  const [uploading, setUploading] = useState(false);
+  const [activeLessonIdForVideo, setActiveLessonIdForVideo] = useState<string | null>(null);
+  const [activeVideoSessionId, setActiveVideoSessionId] = useState<string | null>(null);
+  const backendOrigin = 'http://localhost:4000';
+  const backendBaseUrl = 'http://localhost:4000/api';
 
   useEffect(() => {
     (async () => {
@@ -188,6 +194,119 @@ export default function App() {
     };
     await db.lessons.put(l);
     setLessons(await db.lessons.toArray() as Lesson[]);
+  }
+
+  async function addCustomLesson() {
+    const title = (document.getElementById('lessonTitle') as HTMLInputElement)?.value?.trim();
+    const content = (document.getElementById('lessonContent') as HTMLInputElement)?.value?.trim();
+    const videoUrlInput = (document.getElementById('lessonVideoUrl') as HTMLInputElement)?.value?.trim();
+    const videoUrl = uploadedVideoUrl || videoUrlInput;
+    
+    if (!title || !content) {
+      alert('Please enter both title and content for the lesson');
+      return;
+    }
+
+    const l: Lesson = {
+      id: crypto.randomUUID(),
+      title,
+      content,
+      videoUrl: videoUrl || undefined,
+      version: 1,
+      updatedAt: new Date().toISOString()
+    };
+    await db.lessons.put(l);
+    setLessons(await db.lessons.toArray() as Lesson[]);
+    
+    // Clear form
+    (document.getElementById('lessonTitle') as HTMLInputElement).value = '';
+    (document.getElementById('lessonContent') as HTMLInputElement).value = '';
+    (document.getElementById('lessonVideoUrl') as HTMLInputElement).value = '';
+    setSelectedVideoFile(null);
+    setUploadedVideoUrl(undefined);
+    
+    alert('Lesson created successfully!');
+  }
+
+  async function uploadVideoFile() {
+    if (!selectedVideoFile) { alert('Select a video file first'); return; }
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append('video', selectedVideoFile);
+      const res = await fetch(`${backendBaseUrl}/upload/video`, { method: 'POST', body: form });
+      if (!res.ok) {
+        const t = await res.text();
+        alert(`Upload failed: ${res.status} ${t}`);
+        return;
+      }
+      const data = await res.json();
+      const fileBaseUrl = 'http://localhost:4000';
+      setUploadedVideoUrl(`${fileBaseUrl}${data.url}`);
+      alert('Video uploaded. You can now create the lesson.');
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function addSampleLessons() {
+    const sampleLessons: Lesson[] = [
+      {
+        id: crypto.randomUUID(),
+        title: 'Basic Addition',
+        content: 'Learn how to add single and double digit numbers',
+        version: 1,
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: crypto.randomUUID(),
+        title: 'Multiplication Tables',
+        content: 'Master multiplication tables from 1 to 12',
+        version: 1,
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: crypto.randomUUID(),
+        title: 'Introduction to Algebra',
+        content: 'Basic concepts of variables and equations',
+        version: 1,
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: crypto.randomUUID(),
+        title: 'Photosynthesis',
+        content: 'How plants make their own food using sunlight',
+        version: 1,
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: crypto.randomUUID(),
+        title: 'The Solar System',
+        content: 'Learn about planets, moons, and other celestial bodies',
+        version: 1,
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: crypto.randomUUID(),
+        title: 'Parts of Speech',
+        content: 'Understanding nouns, verbs, adjectives, and adverbs',
+        version: 1,
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: crypto.randomUUID(),
+        title: 'Creative Writing',
+        content: 'Techniques for writing engaging stories and essays',
+        version: 1,
+        updatedAt: new Date().toISOString()
+      }
+    ];
+
+    for (const lesson of sampleLessons) {
+      await db.lessons.put(lesson);
+    }
+    setLessons(await db.lessons.toArray() as Lesson[]);
+    alert('Sample lessons added successfully!');
   }
 
   async function addCustomQuiz() {
@@ -364,6 +483,32 @@ export default function App() {
     setReport(data);
   }
 
+  async function startVideoSession(lessonId: string) {
+    try {
+      const res = await fetch(`${backendBaseUrl}/video-sessions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lessonId, studentId: 'student-001', device: 'web' })
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setActiveVideoSessionId(data.id);
+      setActiveLessonIdForVideo(lessonId);
+    } catch {}
+  }
+
+  async function stopVideoSession() {
+    if (!activeVideoSessionId) return;
+    try {
+      await fetch(`${backendBaseUrl}/video-sessions/${activeVideoSessionId}/stop`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+    } catch {}
+    setActiveVideoSessionId(null);
+    setActiveLessonIdForVideo(null);
+  }
+
   const avgScore = report.length ? (report.reduce((a, r) => a + Number(r.max_score || 0), 0) / report.length).toFixed(2) : '0.00';
   const totalAttempts = report.reduce((a, r) => a + Number(r.attempts_count || 0), 0);
 
@@ -385,9 +530,41 @@ export default function App() {
         {view === 'home' && (
           <>
             <div style={{ ...section, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button style={buttonBase} onClick={addSampleLesson}>Add Lesson (Offline)</button>
+              <button style={buttonBase} onClick={addSampleLesson}>Add Fractions Lesson</button>
+              <button style={buttonBase} onClick={addSampleLessons}>Add Sample Lessons</button>
               <button style={buttonBase} onClick={fetchFromBackend} disabled={syncing}>Fetch from Backend</button>
               <button style={primaryButton} onClick={syncNow} disabled={syncing}>{syncing ? 'Syncing…' : 'Sync Now'}</button>
+            </div>
+
+            <div style={section}>
+              <div style={sectionTitle}>Create Custom Lesson</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8, marginTop: 8 }}>
+                <input style={{ padding: 8, borderRadius: 8, background: colors.panelAlt, color: colors.text, border: `1px solid ${colors.border}` }}
+                  id="lessonTitle"
+                  placeholder="Lesson Title"
+                />
+                <textarea style={{ padding: 8, borderRadius: 8, background: colors.panelAlt, color: colors.text, border: `1px solid ${colors.border}`, minHeight: 80 }}
+                  id="lessonContent"
+                  placeholder="Lesson Content"
+                />
+                <input style={{ padding: 8, borderRadius: 8, background: colors.panelAlt, color: colors.text, border: `1px solid ${colors.border}` }}
+                  id="lessonVideoUrl"
+                  placeholder="Video URL (optional)"
+                />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8 }}>
+                  <input
+                    type="file"
+                    accept="video/*"
+                    onChange={(e) => setSelectedVideoFile(e.target.files?.[0] || null)}
+                    style={{ padding: 8, borderRadius: 8, background: colors.panelAlt, color: colors.text, border: `1px solid ${colors.border}` }}
+                  />
+                  <button style={buttonBase} onClick={uploadVideoFile} disabled={!selectedVideoFile || uploading}>{uploading ? 'Uploading…' : 'Upload Video'}</button>
+                </div>
+                {uploadedVideoUrl && (
+                  <div style={{ color: colors.textMuted, fontSize: 12 }}>Uploaded: {uploadedVideoUrl}</div>
+                )}
+                <button style={buttonBase} onClick={addCustomLesson}>Create Lesson</button>
+              </div>
             </div>
 
             <div style={section}>
@@ -419,6 +596,64 @@ export default function App() {
                 <button style={buttonBase} onClick={addCustomQuiz}>Save Quiz (Offline)</button>
               </div>
             </div>
+
+            <div style={section}>
+              <div style={sectionTitle}>Available Lessons</div>
+              <div style={tableWrap}>
+                <table style={tableStyle}>
+                  <thead>
+                    <tr>
+                      <th style={thtd}>Title</th>
+                      <th style={thtd}>Content</th>
+                      <th style={thtd}>Video</th>
+                      <th style={thtd}>Updated</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lessons.map(lesson => (
+                      <tr key={lesson.id}>
+                        <td style={thtd}>{lesson.title}</td>
+                        <td style={thtd}>{lesson.content.slice(0, 50)}...</td>
+                        <td style={thtd}>
+                          {lesson.videoUrl ? (
+                            <button
+                              style={buttonBase}
+                              onClick={() => startVideoSession(lesson.id)}
+                              disabled={!!activeVideoSessionId}
+                            >Open</button>
+                          ) : 'No'}
+                        </td>
+                        <td style={thtd}>{new Date(lesson.updatedAt).toLocaleDateString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Video Viewer Panel */}
+            {activeLessonIdForVideo && (
+              <div style={{ ...section, borderColor: colors.primary }}>
+                <div style={{ ...sectionTitle, marginBottom: 8 }}>Video Viewer</div>
+                {(() => {
+                  const l = lessons.find(x => x.id === activeLessonIdForVideo);
+                  if (!l) return <div style={{ color: colors.danger }}>Lesson not found</div>;
+                  return (
+                    <div>
+                      <video
+                        src={l.videoUrl}
+                        controls
+                        style={{ width: '100%', borderRadius: 8, background: '#000' }}
+                        onEnded={stopVideoSession}
+                      />
+                      <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                        <button style={buttonBase} onClick={() => { stopVideoSession(); }}>Close</button>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
 
             <div style={section}>
               <div style={sectionTitle}>Lesson Notes</div>

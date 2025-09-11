@@ -41,3 +41,18 @@ CREATE INDEX IF NOT EXISTS idx_quizzes_lesson_id ON quizzes(lesson_id);
 CREATE INDEX IF NOT EXISTS idx_progress_quiz_id ON progress(quiz_id);
 CREATE INDEX IF NOT EXISTS idx_progress_student ON progress(student_id);
 CREATE INDEX IF NOT EXISTS idx_notes_lesson_id ON lesson_notes(lesson_id);
+
+-- Video sessions for tracking student viewing activity
+CREATE TABLE IF NOT EXISTS video_sessions (
+	id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+	lesson_id UUID REFERENCES lessons(id) ON DELETE CASCADE,
+	student_id TEXT NOT NULL,
+	started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+	ended_at TIMESTAMPTZ,
+	duration_seconds INTEGER,
+	device TEXT,
+	created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_video_sessions_lesson_id ON video_sessions(lesson_id);
+CREATE INDEX IF NOT EXISTS idx_video_sessions_student ON video_sessions(student_id);
