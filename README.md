@@ -1,4 +1,6 @@
-# SIH 2025 - Offline-First Digital Learning (Nabha)
+# UTAH - Universal Thinking Advancement Hub
+
+An Offline-First Digital Learning Platform
 
 Monorepo with Yarn Workspaces including:
 - apps/mobile (React Native Expo)
