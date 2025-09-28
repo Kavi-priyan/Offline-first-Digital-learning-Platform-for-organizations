@@ -561,7 +561,7 @@ export default function App() {
     <div style={container}>
       <div style={shell}>
         <header style={header}>
-          <div style={title}>Nabha Learning</div>
+          <div style={title}>UTAH - Universal Thinking Advancement Hub</div>
           <div style={nav}>
             <button style={buttonBase} onClick={() => setView('home')}>Home</button>
             <button style={primaryButton} onClick={async () => { setView('dashboard'); await loadReport(); }}>Teacher Dashboard</button>
