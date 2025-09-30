@@ -12,7 +12,7 @@ const __dirname = path.dirname(__filename);
 async function main() {
 	const databaseUrl = process.env.DATABASE_URL;
 	if (!databaseUrl) {
-		console.error('Missing DATABASE_URL env. Example: postgres://user:pass@localhost:5432/sih2025');
+		console.error('Missing DATABASE_URL env. Example: postgres://user:password@localhost:5432/database_name');
 		process.exit(1);
 	}
 	const schemaPath = path.resolve(__dirname, '../sql/schema.sql');
